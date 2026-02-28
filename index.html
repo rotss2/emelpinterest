@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Static Pinterest Board</title>
+  <style>
+    :root{
+      --bg:#f6f7fb; --card:#fff; --line:#e7eaf0;
+      --text:#121826; --muted:#5d667a; --shadow:0 10px 25px rgba(16,24,40,.08);
+      --r:16px; --primary:#2563eb;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    .topbar{position:sticky;top:0;z-index:50;background:rgba(246,247,251,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+    .wrap{max-width:1200px;margin:0 auto;padding:14px}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:900}
+    .dot{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;background:#111827;color:#fff}
+    .search{flex:1;min-width:220px;display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;box-shadow:0 6px 18px rgba(16,24,40,.06)}
+    .search input{border:none;outline:none;width:100%;font-size:14px}
+    .chips{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{border:1px solid var(--line);background:#fff;color:var(--muted);padding:8px 10px;border-radius:999px;cursor:pointer;font-size:13px;transition:.15s ease;user-select:none}
+    .chip.active{background:#111827;border-color:#111827;color:#fff}
+
+    .board{max-width:1200px;margin:0 auto;padding:14px;column-count:4;column-gap:14px}
+    @media (max-width:1100px){.board{column-count:3}}
+    @media (max-width:800px){.board{column-count:2}}
+    @media (max-width:520px){.board{column-count:1}}
+
+    .pin{break-inside:avoid;margin:0 0 14px;border-radius:var(--r);overflow:hidden;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow)}
+    .imgWrap{background:#eef2ff}
+    .pin img{width:100%;display:block}
+    .body{padding:12px 12px 14px;display:grid;gap:8px}
+    .title{font-weight:900;font-size:14px;line-height:1.25}
+    .desc{color:var(--muted);font-size:13px;line-height:1.5}
+    .meta{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted)}
+    .tag{padding:6px 8px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:12px}
+    .like{
+      border:none;background:transparent;cursor:pointer;
+      font-size:14px;color:var(--muted);display:flex;gap:6px;align-items:center;
+    }
+    .like.liked{color:#ef4444}
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="wrap">
+      <div class="row">
+        <div class="brand"><div class="dot">P</div> Static Board</div>
+        <div class="search">🔎 <input id="q" placeholder="Search (e.g., city, nature, food, coding)"/></div>
+        <div class="chips" id="chips"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="board" id="board"></div>
+
+<script>
+  // ✅ STATIC LIST: fixed image URLs (no random, no refresh changes)
+  // Using picsum.photos with fixed IDs = always same image every time.
+  const PINS = [
+    { id:"1", tag:"Food",   title:"Food photography",          desc:"Food shot inspiration (static image).", img:"https://picsum.photos/id/1080/900/1200" },
+    { id:"2", tag:"Food",   title:"Kitchen prep scene",        desc:"Prep vibe for food content.",         img:"https://picsum.photos/id/292/900/1100" },
+    { id:"3", tag:"Travel", title:"City aerial view",          desc:"Urban travel inspiration.",           img:"https://picsum.photos/id/1011/900/1200" },
+    { id:"4", tag:"Travel", title:"Historic streets",          desc:"Travel + architecture mood.",         img:"https://picsum.photos/id/1031/900/1100" },
+    { id:"5", tag:"Nature", title:"Forest landscape",          desc:"Nature vibe and calm visuals.",       img:"https://picsum.photos/id/1043/900/1200" },
+    { id:"6", tag:"Nature", title:"Mountain scenery",          desc:"Outdoor inspiration (static).",       img:"https://picsum.photos/id/1002/900/1150" },
+    { id:"7", tag:"Coding", title:"Laptop workspace",          desc:"Study / coding motivation.",          img:"https://picsum.photos/id/0/900/1100" },
+    { id:"8", tag:"Coding", title:"Desk setup",                desc:"Clean desk setup inspiration.",       img:"https://picsum.photos/id/180/900/1200" },
+    { id:"9", tag:"Design", title:"Minimal interior",          desc:"Design and layout inspiration.",      img:"https://picsum.photos/id/1060/900/1200" },
+    { id:"10",tag:"Design", title:"Typography poster style",   desc:"Poster and text layout ideas.",       img:"https://picsum.photos/id/870/900/1100" },
+    { id:"11",tag:"Gaming", title:"Neon game vibe",            desc:"Gaming mood inspiration.",            img:"https://picsum.photos/id/1050/900/1150" },
+    { id:"12",tag:"Gaming", title:"Controller lifestyle",      desc:"Gaming content vibe (static).",       img:"https://picsum.photos/id/1069/900/1200" }
+  ];
+
+  const board = document.getElementById("board");
+  const q = document.getElementById("q");
+  const chipsWrap = document.getElementById("chips");
+
+  let activeTag = "All";
+
+  const tags = ["All", ...Array.from(new Set(PINS.map(p=>p.tag)))];
+
+  function renderChips(){
+    chipsWrap.innerHTML = "";
+    tags.forEach(tag=>{
+      const c = document.createElement("div");
+      c.className = "chip" + (tag===activeTag ? " active" : "");
+      c.textContent = tag;
+      c.onclick = ()=>{ activeTag = tag; renderChips(); renderPins(); };
+      chipsWrap.appendChild(c);
+    });
+  }
+
+  function getFiltered(){
+    const text = q.value.trim().toLowerCase();
+    return PINS.filter(p=>{
+      const okTag = (activeTag==="All") || (p.tag===activeTag);
+      const okText = !text || (p.title.toLowerCase().includes(text) || p.desc.toLowerCase().includes(text) || p.tag.toLowerCase().includes(text));
+      return okTag && okText;
+    });
+  }
+
+  function renderPins(){
+    board.innerHTML = "";
+    getFiltered().forEach(p=>{
+      const el = document.createElement("div");
+      el.className = "pin";
+      el.innerHTML = `
+        <div class="imgWrap">
+          <img src="${p.img}" alt="${escapeHtml(p.title)}" loading="lazy">
+        </div>
+        <div class="body">
+          <div class="title">${escapeHtml(p.title)}</div>
+          <div class="desc">${escapeHtml(p.desc)}</div>
+          <div class="meta">
+            <span class="tag">${escapeHtml(p.tag)}</span>
+            <button class="like" type="button" aria-label="like">♡ <span>0</span></button>
+          </div>
+        </div>
+      `;
+      const likeBtn = el.querySelector(".like");
+      const countEl = likeBtn.querySelector("span");
+      let count = 0;
+      likeBtn.onclick = ()=>{
+        if(likeBtn.classList.contains("liked")){
+          likeBtn.classList.remove("liked");
+          count = Math.max(0, count-1);
+        }else{
+          likeBtn.classList.add("liked");
+          count++;
+        }
+        countEl.textContent = count;
+      };
+      board.appendChild(el);
+    });
+  }
+
+  function escapeHtml(s){
+    return (s+"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+  }
+
+  q.addEventListener("input", renderPins);
+
+  renderChips();
+  renderPins();
+</script>
+</body>
+</html>
